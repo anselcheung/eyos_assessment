@@ -168,6 +168,8 @@ def evaluate(model, df_test):
     if use_cuda:
         model = model.cuda()
 
+    model.eval()
+
     total_acc_test = 0.0
     total_f1_test = 0
 
@@ -232,6 +234,8 @@ def evaluate_one_text(model, sentence):
     if use_cuda:
         model = model.cuda()
 
+    model.eval()
+
     text = tokenizer(sentence, padding='max_length', max_length = 512, truncation=True, return_tensors="pt")
 
     mask = text['attention_mask'].to(device)
@@ -251,7 +255,7 @@ if __name__=='__main__':
 
     label_all_tokens = False
 
-    data = pd.read_csv('labelled_data.csv')
+    data = pd.read_csv('labelled_data_new.csv')
     data['pos_tag'] = data['pos_tag'].apply(ast.literal_eval)
 
     labels = data['pos_tag'].tolist()
@@ -269,16 +273,17 @@ if __name__=='__main__':
                             [int(.8 * len(data)), int(.9 * len(data))])
     
     LEARNING_RATE = 5e-3
-    EPOCHS = 20
-    BATCH_SIZE = 8
+    EPOCHS = 10
+    BATCH_SIZE = 2
 
     model = BertModel()
     train_loop(model, df_train, df_val)
+    torch.save(model.state_dict(), 'bert-base-uncased.pt')
 
     evaluate(model, df_test)
 
-    torch.save(model.state_dict(), 'bert.pt')
-
-    model.eval()
-
-    evaluate_one_text(model, 'SEA GULL NAPTH 25g WRNA / PCS')
+    evaluate_one_text(model, 'SEAGULL NAPTH 25g WRNA / PCS')
+    evaluate_one_text(model, 'SEA GULL WARNA RENTENG')
+    evaluate_one_text(model, 'MANGKOK SAMBAL ALL VAR')
+    evaluate_one_text(model, 'SEA GULL NAPHT 25GR SG-519W 1PCSX 1.500,00:')
+    evaluate_one_text(model, 'SEAQULL NAPT WARNA 25GR')
