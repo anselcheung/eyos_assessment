@@ -6,7 +6,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.optim import SGD, Adam
 import ast
-from seqeval.metrics import f1_score
+from seqeval.metrics import f1_score, classification_report, accuracy_score
+torch.manual_seed(1234)
 
 def align_label(texts, labels):
     tokenized_inputs = tokenizer(texts, padding='max_length', max_length=512, truncation=True)
@@ -168,10 +169,8 @@ def evaluate(model, df_test):
     if use_cuda:
         model = model.cuda()
 
-    model.eval()
-
-    total_acc_test = 0.0
-    total_f1_test = 0
+    preds = []
+    labels = []
 
     for test_data, test_label in test_dataloader:
 
@@ -188,16 +187,18 @@ def evaluate(model, df_test):
                 label_clean = test_label[i][test_label[i] != -100]
 
                 predictions = logits_clean.argmax(dim=1)
-                acc = (predictions == label_clean).float().mean()
-                total_acc_test += acc
 
-                pred_labels = [[ids_to_labels[i] for i in label_clean.tolist()]]
-                val_labels = [[ids_to_labels[i] for i in predictions.tolist()]]
-                f1 = f1_score(val_labels, pred_labels)
-                total_f1_test += f1
+                pred_labels = [ids_to_labels[i] for i in label_clean.tolist()]
+                val_labels = [ids_to_labels[i] for i in predictions.tolist()]
 
-    print(f'Test Accuracy: {total_acc_test / len(df_test): .3f} | Test F1 Score: {total_f1_test / len(df_test): .3f}')
+                preds.append(val_labels)
+                labels.append(pred_labels)
+    
+    print(f"Accuracy: {accuracy_score(labels, preds)}")
+    print(classification_report(labels, preds))
 
+    return preds
+    
 def align_word_ids(texts):
   
     tokenized_inputs = tokenizer(texts, padding='max_length', max_length=512, truncation=True)
@@ -234,15 +235,15 @@ def evaluate_one_text(model, sentence):
     if use_cuda:
         model = model.cuda()
 
-    model.eval()
-
     text = tokenizer(sentence, padding='max_length', max_length = 512, truncation=True, return_tensors="pt")
 
     mask = text['attention_mask'].to(device)
     input_id = text['input_ids'].to(device)
     label_ids = torch.Tensor(align_word_ids(sentence)).unsqueeze(0).to(device)
 
-    logits = model(input_id, mask, None)
+    with torch.no_grad():
+        logits = model(input_id, mask, None)
+
     logits_clean = logits[0][label_ids != -100]
 
     predictions = logits_clean.argmax(dim=1).tolist()
@@ -255,10 +256,16 @@ if __name__=='__main__':
 
     label_all_tokens = False
 
-    data = pd.read_csv('labelled_data_new.csv')
-    data['pos_tag'] = data['pos_tag'].apply(ast.literal_eval)
+    df_train = pd.read_csv('df_train.csv')
+    df_train['labels'] = df_train['labels'].apply(ast.literal_eval)
 
-    labels = data['pos_tag'].tolist()
+    df_val= pd.read_csv('df_val.csv')
+    df_val['labels'] = df_val['labels'].apply(ast.literal_eval)
+
+    df_test= pd.read_csv('df_test.csv')
+    df_test['labels'] = df_test['labels'].apply(ast.literal_eval)
+
+    labels = df_train['labels'].tolist() + df_val['labels'].tolist() + df_test['labels'].tolist()
     unique_labels = set()
 
     for lb in labels:
@@ -266,21 +273,22 @@ if __name__=='__main__':
         
     labels_to_ids = {k: v for v, k in enumerate(unique_labels)}
     ids_to_labels = {v: k for v, k in enumerate(unique_labels)}
-
-    data.rename(columns={'pos_tag': 'labels'}, inplace=True)
-
-    df_train, df_val, df_test = np.split(data.sample(frac=1, random_state=42),
-                            [int(.8 * len(data)), int(.9 * len(data))])
     
     LEARNING_RATE = 5e-3
-    EPOCHS = 10
-    BATCH_SIZE = 2
+    EPOCHS = 25
+    BATCH_SIZE = 8
 
     model = BertModel()
     train_loop(model, df_train, df_val)
-    torch.save(model.state_dict(), 'bert-base-uncased.pt')
+    torch.save(model.state_dict(), 'bert-base-uncased_2.pt')
 
-    evaluate(model, df_test)
+    _ = evaluate(model, df_test)
+
+    # get preds for whole dataset
+    data = pd.concat([df_train, df_val, df_test], ignore_index=True)
+    preds = evaluate(model, data)
+    data['preds'] = preds
+    data.to_csv('data_with_preds_2.csv', index=False)
 
     evaluate_one_text(model, 'SEAGULL NAPTH 25g WRNA / PCS')
     evaluate_one_text(model, 'SEA GULL WARNA RENTENG')
