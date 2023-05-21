@@ -30,5 +30,5 @@ The product names are given as a string, where there might include many redundan
 
 ## Directory Structure
 
-* `eyos_assessment.ipynb` - the whole process of the project
+* `eyos_assessment.ipynb` - notebook documenting the whole process of the project
 * `train_script.py` - training and inference script for Bert NER
