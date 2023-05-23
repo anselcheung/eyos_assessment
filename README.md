@@ -35,5 +35,5 @@ The product names are given as a string, where there might include many redundan
 
 ## Running the notebook
 
-Install requirements: `pip install -r requirements.txt`
-Run notebook: `jupyter lab`
+* Install requirements: `pip install -r requirements.txt`
+* Run notebook: `jupyter lab`
