@@ -32,3 +32,8 @@ The product names are given as a string, where there might include many redundan
 
 * `eyos_assessment.ipynb` - notebook documenting the whole process of the project
 * `train_script.py` - training and inference script for Bert NER
+
+## Running the notebook
+
+* Install requirements: `pip install -r requirements.txt`
+* Run notebook: `jupyter lab`
